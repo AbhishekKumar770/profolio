@@ -1,0 +1,73 @@
+# .NET
+[Bb]in/
+[Oo]bj/
+[Ll]ogs/
+*.user
+*.suo
+*.cache
+*.pdb
+*.dll
+*.exe
+artifacts/
+TestResults/
+coverage/
+.nuget/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.sln.docstates
+_ReSharper*/
+*.DotSettings.user
+
+# VS Code (keep shared workspace settings if intentionally committed)
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+dist/
+build/
+coverage/
+.npm/
+*.tsbuildinfo
+next-env.d.ts
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+!.env.template
+secrets/
+*.pem
+*.key
+*.pfx
+*.p12
+
+# Local databases and data
+*.mdf
+*.ldf
+*.db
+*.sqlite
+*.sqlite3
+
+# OS files
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+Desktop.ini
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
+*.swo
+*.bak
+
+# User-specific local configuration
+appsettings.Local.json
+appsettings.*.Local.json
