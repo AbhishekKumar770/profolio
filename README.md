@@ -32,14 +32,14 @@ Multi-profession support, subscription plans and payments, analytics, custom dom
 | Area | Technology |
 |---|---|
 | Frontend | Next.js + TypeScript |
-| Backend | ASP.NET Core Web API |
+| Backend | ASP.NET Core 10 Web API |
 | Architecture | Modular Monolith + Clean Architecture |
-| Database | Microsoft SQL Server |
-| Data access | Entity Framework Core |
+| Database | PostgreSQL |
+| Data access | Entity Framework Core 10 (Npgsql) |
 | API style | REST + OpenAPI |
 | Authentication | ASP.NET Core Identity |
 | UI data | TanStack Query where appropriate |
-| Deployment | Docker; CI/CD planned |
+| Hosting targets | Vercel (Frontend), Render (API), Neon (Database); Docker VPS portable |
 
 Versions and hosting providers will be selected and documented when implementation begins.
 
@@ -49,13 +49,13 @@ Versions and hosting providers will be selected and documented when implementati
 Developer
    |
    v
-Next.js Dashboard -----> ASP.NET Core Web API
+Next.js Dashboard -----> ASP.NET Core 10 Web API
                               |
                               v
                          Application
                               |
                               v
-                         SQL Server
+                         PostgreSQL
                               |
                        Draft portfolio data
                               |
@@ -94,9 +94,9 @@ Detailed decisions are maintained in:
 Install these when the corresponding implementation phase starts:
 
 - Git
-- .NET SDK (version to be pinned when backend setup begins)
+- .NET 10 SDK
 - Node.js LTS and npm
-- SQL Server (local instance or container)
+- PostgreSQL 16+ (local instance, container, or Neon database)
 - Docker Desktop (for container workflows)
 - A code editor such as Visual Studio Code or Visual Studio
 

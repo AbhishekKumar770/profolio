@@ -71,3 +71,8 @@ Desktop.ini
 # User-specific local configuration
 appsettings.Local.json
 appsettings.*.Local.json
+
+# Local tooling and machine-specific files
+.local/
+**/.local/
+Library/
