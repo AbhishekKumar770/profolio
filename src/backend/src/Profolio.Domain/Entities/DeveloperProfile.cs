@@ -1,5 +1,6 @@
 
 using Profolio.Domain.Common;
+using Profolio.Domain.ValueObjects;
 
 namespace Profolio.Domain.Entities;
 
@@ -15,6 +16,8 @@ public sealed class DeveloperProfile : BaseEntity, ITenantEntity
 
     public string? Location { get; private set; }
 
+    public EmailAddress? PublicContactEmail { get; private set; }
+
     private DeveloperProfile()
     {
         // Required by EF Core for entity materialization.
@@ -27,6 +30,26 @@ public sealed class DeveloperProfile : BaseEntity, ITenantEntity
 
         TenantId = tenantId;
         SetBasicInformation(fullName, headline);
+    }
+
+    public void SetPublicContactEmail(EmailAddress contactEmail)
+    {
+        ArgumentNullException.ThrowIfNull(contactEmail);
+
+        if (PublicContactEmail == contactEmail)
+            return;
+
+        PublicContactEmail = contactEmail;
+        MarkAsUpdated();
+    }
+
+    public void ClearPublicContactEmail()
+    {
+        if (PublicContactEmail is null)
+            return;
+
+        PublicContactEmail = null;
+        MarkAsUpdated();
     }
 
     public void UpdateBasicInformation(

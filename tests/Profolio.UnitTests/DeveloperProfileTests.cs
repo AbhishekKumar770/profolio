@@ -1,4 +1,5 @@
 using Profolio.Domain.Entities;
+using Profolio.Domain.ValueObjects;
 
 namespace Profolio.UnitTests;
 
@@ -22,6 +23,7 @@ public class DeveloperProfileTests
         Assert.Equal(headline, profile.Headline);
         Assert.Null(profile.Bio);
         Assert.Null(profile.Location);
+        Assert.Null(profile.PublicContactEmail);
         Assert.True(profile.CreatedAtUtc <= DateTime.UtcNow);
         Assert.Null(profile.UpdatedAtUtc);
     }
@@ -147,5 +149,121 @@ public class DeveloperProfileTests
         Assert.NotNull(profile.UpdatedAtUtc);
         Assert.True(profile.UpdatedAtUtc >= profile.CreatedAtUtc);
         Assert.True(profile.UpdatedAtUtc <= DateTime.UtcNow);
+    }
+
+    [Fact]
+    public void SetPublicContactEmail_WithValidEmail_SetsPropertyAndUpdatesTimestamp()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var profile = new DeveloperProfile(tenantId, "Ada Lovelace", "Programmer");
+        var email = new EmailAddress("ada.lovelace@example.com");
+
+        // Act
+        profile.SetPublicContactEmail(email);
+
+        // Assert
+        Assert.NotNull(profile.PublicContactEmail);
+        Assert.Equal(email, profile.PublicContactEmail);
+        Assert.NotNull(profile.UpdatedAtUtc);
+        Assert.True(profile.UpdatedAtUtc >= profile.CreatedAtUtc);
+    }
+
+    [Fact]
+    public void SetPublicContactEmail_WithNull_ThrowsArgumentNullException()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var profile = new DeveloperProfile(tenantId, "Ada Lovelace", "Programmer");
+
+        // Act & Assert
+        var exception = Assert.Throws<ArgumentNullException>(() => profile.SetPublicContactEmail(null!));
+        Assert.Equal("contactEmail", exception.ParamName);
+    }
+
+    [Fact]
+    public void SetPublicContactEmail_PreservesIdAndTenantId()
+    {
+        // Arrange
+        var originalTenantId = Guid.NewGuid();
+        var profile = new DeveloperProfile(originalTenantId, "Ada Lovelace", "Programmer");
+        var originalId = profile.Id;
+        var email = new EmailAddress("ada.lovelace@example.com");
+
+        // Act
+        profile.SetPublicContactEmail(email);
+
+        // Assert
+        Assert.Equal(originalId, profile.Id);
+        Assert.Equal(originalTenantId, profile.TenantId);
+    }
+
+    [Fact]
+    public void SetPublicContactEmail_WithSameEmailInstance_DoesNotModifyUpdatedAtUtc()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var profile = new DeveloperProfile(tenantId, "Ada Lovelace", "Programmer");
+        var email = new EmailAddress("ada.lovelace@example.com");
+        profile.SetPublicContactEmail(email);
+        var originalUpdatedAt = profile.UpdatedAtUtc;
+
+        // Act
+        profile.SetPublicContactEmail(email);
+
+        // Assert
+        Assert.Equal(originalUpdatedAt, profile.UpdatedAtUtc);
+    }
+
+    [Fact]
+    public void SetPublicContactEmail_WithDifferentInstanceHavingSameNormalizedValue_DoesNotModifyUpdatedAtUtc()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var profile = new DeveloperProfile(tenantId, "Ada Lovelace", "Programmer");
+        var email1 = new EmailAddress("ada.lovelace@example.com");
+        var email2 = new EmailAddress("ada.lovelace@EXAMPLE.com");
+        profile.SetPublicContactEmail(email1);
+        var originalUpdatedAt = profile.UpdatedAtUtc;
+
+        // Act
+        profile.SetPublicContactEmail(email2);
+
+        // Assert
+        Assert.Equal(originalUpdatedAt, profile.UpdatedAtUtc);
+    }
+
+    [Fact]
+    public void ClearPublicContactEmail_WhenEmailExists_ClearsEmailAndUpdatesTimestamp()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var profile = new DeveloperProfile(tenantId, "Ada Lovelace", "Programmer");
+        profile.SetPublicContactEmail(new EmailAddress("ada.lovelace@example.com"));
+        Assert.NotNull(profile.PublicContactEmail);
+
+        // Act
+        profile.ClearPublicContactEmail();
+
+        // Assert
+        Assert.Null(profile.PublicContactEmail);
+        Assert.NotNull(profile.UpdatedAtUtc);
+    }
+
+    [Fact]
+    public void ClearPublicContactEmail_WhenAlreadyNull_DoesNotModifyEntity()
+    {
+        // Arrange
+        var tenantId = Guid.NewGuid();
+        var profile = new DeveloperProfile(tenantId, "Ada Lovelace", "Programmer");
+        Assert.Null(profile.PublicContactEmail);
+        Assert.Null(profile.UpdatedAtUtc);
+
+        // Act
+        profile.ClearPublicContactEmail();
+
+        // Assert
+        Assert.Null(profile.PublicContactEmail);
+        Assert.Null(profile.UpdatedAtUtc);
     }
 }
