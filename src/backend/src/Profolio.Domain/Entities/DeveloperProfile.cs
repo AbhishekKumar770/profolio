@@ -3,8 +3,10 @@ using Profolio.Domain.Common;
 
 namespace Profolio.Domain.Entities;
 
-public sealed class DeveloperProfile : BaseEntity
+public sealed class DeveloperProfile : BaseEntity, ITenantEntity
 {
+    public Guid TenantId { get; private set; }
+
     public string FullName { get; private set; } = string.Empty;
 
     public string Headline { get; private set; } = string.Empty;
@@ -18,8 +20,12 @@ public sealed class DeveloperProfile : BaseEntity
         // Required by EF Core for entity materialization.
     }
 
-    public DeveloperProfile(string fullName, string headline)
+    public DeveloperProfile(Guid tenantId, string fullName, string headline)
     {
+        if (tenantId == Guid.Empty)
+            throw new ArgumentException("Tenant ID cannot be empty.", nameof(tenantId));
+
+        TenantId = tenantId;
         SetBasicInformation(fullName, headline);
     }
 
