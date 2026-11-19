@@ -16,6 +16,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\backend\src\Profolio.Application\Profolio.Application.csproj" />
     <ProjectReference Include="..\..\src\backend\src\Profolio.Domain\Profolio.Domain.csproj" />
+    <ProjectReference Include="..\..\src\backend\src\Profolio.Infrastructure\Profolio.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>
