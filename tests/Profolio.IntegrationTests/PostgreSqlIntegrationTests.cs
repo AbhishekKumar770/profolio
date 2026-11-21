@@ -6,6 +6,12 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using Profolio.Application.Common.Results;
+using Profolio.Application.Features.DeveloperProfile.Commands.ClearPublicContactEmail;
+using Profolio.Application.Features.DeveloperProfile.Commands.SetPublicContactEmail;
+using Profolio.Application.Features.DeveloperProfile.Commands.UpdateDeveloperProfile;
+using Profolio.Application.Features.DeveloperProfile.Queries.GetDeveloperProfile;
+using Profolio.Application.Features.DeveloperProfile.Validation;
 using Profolio.Domain.Entities;
 using Profolio.Domain.ValueObjects;
 using Profolio.Infrastructure.Persistence;
@@ -597,5 +603,168 @@ public sealed class PostgreSqlIntegrationTests
         // Nonexistent username
         var nonExistent = await directory.UsernameExistsAsync(new Username("nonexistent99"));
         Assert.False(nonExistent);
+    }
+
+    // -------------------------------------------------------------------------
+    // 12. DeveloperProfile Application Use-Case Integration Tests
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task PostgreSql_DeveloperProfile_GetProfile_ReturnsPersistedData()
+    {
+        var usernameStr = $"usr{Guid.NewGuid():N}"[..12];
+        var userId = $"auth-{Guid.NewGuid():N}"[..16];
+        var tenantId = await ProvisionTenantAsync(userId, usernameStr);
+
+        var tenantContext = TestTenantContext.AuthenticatedWithTenant(tenantId, userId);
+        using var context = new ProfolioDbContext(CreateOptions(), tenantContext);
+        var handler = new GetDeveloperProfileQueryHandler(context, tenantContext);
+
+        var result = await handler.HandleAsync(new GetDeveloperProfileQuery());
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value);
+        Assert.Equal("Test User", result.Value.FullName);
+        Assert.Equal("Developer", result.Value.Headline);
+        Assert.Null(result.Value.Bio);
+        Assert.Null(result.Value.Location);
+        Assert.Null(result.Value.PublicContactEmail);
+        Assert.True(result.Value.CreatedAtUtc <= DateTime.UtcNow);
+        Assert.Null(result.Value.UpdatedAtUtc);
+    }
+
+    [Fact]
+    public async Task PostgreSql_DeveloperProfile_UpdateProfile_PersistsChanges()
+    {
+        var usernameStr = $"usr{Guid.NewGuid():N}"[..12];
+        var userId = $"auth-{Guid.NewGuid():N}"[..16];
+        var tenantId = await ProvisionTenantAsync(userId, usernameStr);
+
+        var tenantContext = TestTenantContext.AuthenticatedWithTenant(tenantId, userId);
+        using (var context = new ProfolioDbContext(CreateOptions(), tenantContext))
+        {
+            var handler = new UpdateDeveloperProfileCommandHandler(context, tenantContext);
+            var command = new UpdateDeveloperProfileCommand("Grace Hopper", "Computer Scientist", "Pioneered compilers", "Arlington, VA");
+
+            var result = await handler.HandleAsync(command);
+            Assert.True(result.IsSuccess);
+        }
+
+        // Verify with a new context from PostgreSQL
+        using (var verifyContext = new ProfolioDbContext(CreateOptions(), tenantContext))
+        {
+            var profile = await verifyContext.DeveloperProfiles.SingleAsync(p => p.TenantId == tenantId);
+            Assert.Equal("Grace Hopper", profile.FullName);
+            Assert.Equal("Computer Scientist", profile.Headline);
+            Assert.Equal("Pioneered compilers", profile.Bio);
+            Assert.Equal("Arlington, VA", profile.Location);
+            Assert.NotNull(profile.UpdatedAtUtc);
+        }
+    }
+
+    [Fact]
+    public async Task PostgreSql_DeveloperProfile_SetAndClearContactEmail_Persists()
+    {
+        var usernameStr = $"usr{Guid.NewGuid():N}"[..12];
+        var userId = $"auth-{Guid.NewGuid():N}"[..16];
+        var tenantId = await ProvisionTenantAsync(userId, usernameStr);
+
+        var tenantContext = TestTenantContext.AuthenticatedWithTenant(tenantId, userId);
+
+        // 1. Set Email
+        using (var context = new ProfolioDbContext(CreateOptions(), tenantContext))
+        {
+            var handler = new SetPublicContactEmailCommandHandler(context, tenantContext);
+            var result = await handler.HandleAsync(new SetPublicContactEmailCommand("Grace.Hopper@USNavy.MIL"));
+            Assert.True(result.IsSuccess);
+        }
+
+        // Verify Set in Database (normalized to lowercase domain)
+        using (var verifyContext = new ProfolioDbContext(CreateOptions(), tenantContext))
+        {
+            var profile = await verifyContext.DeveloperProfiles.SingleAsync(p => p.TenantId == tenantId);
+            Assert.NotNull(profile.PublicContactEmail);
+            Assert.Equal("Grace.Hopper@usnavy.mil", profile.PublicContactEmail.Value);
+        }
+
+        // 2. Clear Email
+        using (var context = new ProfolioDbContext(CreateOptions(), tenantContext))
+        {
+            var handler = new ClearPublicContactEmailCommandHandler(context, tenantContext);
+            var result = await handler.HandleAsync(new ClearPublicContactEmailCommand());
+            Assert.True(result.IsSuccess);
+        }
+
+        // Verify Cleared in Database
+        using (var verifyContext = new ProfolioDbContext(CreateOptions(), tenantContext))
+        {
+            var profile = await verifyContext.DeveloperProfiles.SingleAsync(p => p.TenantId == tenantId);
+            Assert.Null(profile.PublicContactEmail);
+        }
+    }
+
+    [Fact]
+    public async Task PostgreSql_DeveloperProfile_TenantIsolation_CannotReadOrUpdateOtherTenant()
+    {
+        var tenantA_Id = await ProvisionTenantAsync($"auth-a-{Guid.NewGuid():N}"[..16], $"usra{Guid.NewGuid():N}"[..12]);
+        var tenantB_Id = await ProvisionTenantAsync($"auth-b-{Guid.NewGuid():N}"[..16], $"usrb{Guid.NewGuid():N}"[..12]);
+
+        var tenantA_Context = TestTenantContext.AuthenticatedWithTenant(tenantA_Id);
+        var tenantB_Context = TestTenantContext.AuthenticatedWithTenant(tenantB_Id);
+
+        // Tenant A updates their profile
+        using (var contextA = new ProfolioDbContext(CreateOptions(), tenantA_Context))
+        {
+            var handlerA = new UpdateDeveloperProfileCommandHandler(contextA, tenantA_Context);
+            var resultA = await handlerA.HandleAsync(new UpdateDeveloperProfileCommand("Tenant A User", "Specialist A", null, null));
+            Assert.True(resultA.IsSuccess);
+        }
+
+        // Tenant B reads their profile: must only see Tenant B's data
+        using (var contextB = new ProfolioDbContext(CreateOptions(), tenantB_Context))
+        {
+            var queryHandlerB = new GetDeveloperProfileQueryHandler(contextB, tenantB_Context);
+            var resultB = await queryHandlerB.HandleAsync(new GetDeveloperProfileQuery());
+
+            Assert.True(resultB.IsSuccess);
+            Assert.Equal("Test User", resultB.Value.FullName);
+            Assert.Equal("Developer", resultB.Value.Headline);
+        }
+    }
+
+    [Fact]
+    public async Task PostgreSql_DeveloperProfile_OptimisticConcurrency_ReturnsConflict()
+    {
+        var usernameStr = $"usr{Guid.NewGuid():N}"[..12];
+        var userId = $"auth-{Guid.NewGuid():N}"[..16];
+        var tenantId = await ProvisionTenantAsync(userId, usernameStr);
+
+        var tenantContext = TestTenantContext.AuthenticatedWithTenant(tenantId, userId);
+
+        using var contextA = new ProfolioDbContext(CreateOptions(), tenantContext);
+        using var contextB = new ProfolioDbContext(CreateOptions(), tenantContext);
+
+        // Both contexts load the profile
+        var profileA = await contextA.DeveloperProfiles.SingleAsync(p => p.TenantId == tenantId);
+        var profileB = await contextB.DeveloperProfiles.SingleAsync(p => p.TenantId == tenantId);
+
+        // Context A updates and saves first
+        profileA.UpdateBasicInformation("Ada Lovelace", "Version 1 Headline", null, null);
+        await contextA.SaveChangesAsync();
+
+        // Context B uses handler with stale tracked profile
+        var handlerB = new UpdateDeveloperProfileCommandHandler(contextB, tenantContext);
+        var commandB = new UpdateDeveloperProfileCommand("Ada Lovelace", "Version 2 Stale Headline", null, null);
+
+        var resultB = await handlerB.HandleAsync(commandB);
+
+        Assert.True(resultB.IsFailure);
+        Assert.Equal("Concurrency.Conflict", resultB.Error!.Code);
+        Assert.Equal(ErrorType.Conflict, resultB.Error.Type);
+
+        // Verify Context A's update remains in PostgreSQL
+        using var verifyContext = new ProfolioDbContext(CreateOptions(), tenantContext);
+        var verified = await verifyContext.DeveloperProfiles.SingleAsync(p => p.TenantId == tenantId);
+        Assert.Equal("Version 1 Headline", verified.Headline);
     }
 }
