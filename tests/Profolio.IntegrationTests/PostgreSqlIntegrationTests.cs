@@ -18,7 +18,7 @@ using Profolio.Infrastructure.Persistence;
 using Profolio.Infrastructure.Persistence.Services;
 using Xunit;
 
-public sealed class PostgreSqlIntegrationTests
+public sealed partial class PostgreSqlIntegrationTests
 {
     public const string ApprovedTestDatabaseName = "profolio_test";
 

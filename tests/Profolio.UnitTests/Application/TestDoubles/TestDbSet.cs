@@ -7,6 +7,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Threading;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 public sealed class TestDbSet<TEntity> : DbSet<TEntity>, IQueryable<TEntity>, IAsyncEnumerable<TEntity>
     where TEntity : class
@@ -23,6 +24,18 @@ public sealed class TestDbSet<TEntity> : DbSet<TEntity>, IQueryable<TEntity>, IA
     public List<TEntity> Data => _data;
 
     public override Microsoft.EntityFrameworkCore.Metadata.IEntityType EntityType => null!;
+
+    public override EntityEntry<TEntity> Add(TEntity entity)
+    {
+        _data.Add(entity);
+        return null!;
+    }
+
+    public override EntityEntry<TEntity> Remove(TEntity entity)
+    {
+        _data.Remove(entity);
+        return null!;
+    }
 
     Type IQueryable.ElementType => _queryable.ElementType;
     Expression IQueryable.Expression => _queryable.Expression;
